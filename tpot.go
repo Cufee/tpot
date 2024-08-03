@@ -6,16 +6,16 @@ import (
 	"net/url"
 )
 
-type ContextBuilder func(http.ResponseWriter, *http.Request) Context
+type ContextBuilder[C Context] func(http.ResponseWriter, *http.Request) C
 
-type Servable interface {
-	Handler(ContextBuilder) http.Handler
+type Servable[C Context] interface {
+	Handler(ContextBuilder[C]) http.Handler
 	Serve(Context)
 }
 
 type Middleware func(ctx Context, next func(Context)) func(Context)
 
-func ChainHandler(ctxBuilder ContextBuilder, s Servable, middleware ...Middleware) http.Handler {
+func ChainHandler[C Context](ctxBuilder ContextBuilder[C], s Servable[C], middleware ...Middleware) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := ctxBuilder(w, r)
 		chain := s.Serve

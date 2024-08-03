@@ -12,48 +12,40 @@ import (
 /*
 A convenience wrapper for rendering a layout with some customizations
 */
-type Layout func(tpot.Context, ...templ.Component) (templ.Component, error)
-
-var _ tpot.Servable = new(Page)
+type Layout[C tpot.Context] func(C, ...templ.Component) (templ.Component, error)
 
 /*
 A handler that returns a layout wrapper, and a templ.Component body
   - The layout is rendered and then wrapped around the body component
   - Both layout and component can be safely returned as nil
 */
-type Page func(tpot.Context) (Layout, templ.Component, error)
-
-var _ tpot.Servable = new(Partial)
+type Page[C tpot.Context] func(C) (Layout[C], templ.Component, error)
 
 /*
 A handler that returns a body templ.Component without a layout
   - The intended use case is returning templ components for HTMX requests
   - Component can be safely returned as nil
 */
-type Partial func(tpot.Context) (templ.Component, error)
-
-var _ tpot.Servable = new(Endpoint)
+type Partial[C tpot.Context] func(C) (templ.Component, error)
 
 /*
 An endpoint handler that does not return any templ components
 */
-type Endpoint func(tpot.Context) error
-
-var _ tpot.Servable = new(WebSocket)
+type Endpoint[C tpot.Context] func(C) error
 
 /*
 A WebSocket specific handler
   - Returns an upgrader and a handler function that will be called after the upgrade
 */
-type WebSocket func(tpot.Context) (*websocket.Upgrader, func(conn *websocket.Conn) error, error)
+type WebSocket[C tpot.Context] func(C) (*websocket.Upgrader, func(conn *websocket.Conn) error, error)
 
-func (page Page) Handler(ctx tpot.ContextBuilder) http.Handler {
+func (page Page[C]) Handler(ctx tpot.ContextBuilder[C]) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		page.Serve(ctx(w, r))
 	})
 }
 
-func (page Page) Serve(ctx tpot.Context) {
+func (page Page[C]) Serve(ctx C) {
 	layout, body, err := page(ctx)
 	if err != nil {
 		ctx.Err(errors.Wrap(err, "page handler returned an error"))
@@ -86,13 +78,13 @@ func (page Page) Serve(ctx tpot.Context) {
 	}
 }
 
-func (partial Partial) Handler(ctx tpot.ContextBuilder) http.Handler {
+func (partial Partial[C]) Handler(ctx tpot.ContextBuilder[C]) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		partial.Serve(ctx(w, r))
 	})
 }
 
-func (partial Partial) Serve(ctx tpot.Context) {
+func (partial Partial[C]) Serve(ctx C) {
 	content, err := partial(ctx)
 	if err != nil {
 		ctx.Err(errors.Wrap(err, "partial handler returned an error"))
@@ -109,13 +101,13 @@ func (partial Partial) Serve(ctx tpot.Context) {
 	}
 }
 
-func (endpoint Endpoint) Handler(ctx tpot.ContextBuilder) http.Handler {
+func (endpoint Endpoint[C]) Handler(ctx tpot.ContextBuilder[C]) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		endpoint.Serve(ctx(w, r))
 	})
 }
 
-func (endpoint Endpoint) Serve(ctx tpot.Context) {
+func (endpoint Endpoint[C]) Serve(ctx C) {
 	err := endpoint(ctx)
 	if err != nil {
 		ctx.Err(errors.Wrap(err, "endpoint handler returned an error"))
@@ -123,13 +115,13 @@ func (endpoint Endpoint) Serve(ctx tpot.Context) {
 	}
 }
 
-func (ws WebSocket) Handler(ctx tpot.ContextBuilder) http.Handler {
+func (ws WebSocket[C]) Handler(ctx tpot.ContextBuilder[C]) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ws.Serve(ctx(w, r))
 	})
 }
 
-func (ws WebSocket) Serve(ctx tpot.Context) {
+func (ws WebSocket[C]) Serve(ctx C) {
 	u, handler, err := ws(ctx)
 	if err != nil {
 		ctx.Err(errors.Wrap(err, "websocket handler returned an error"))
@@ -147,15 +139,15 @@ func (ws WebSocket) Serve(ctx tpot.Context) {
 	handler(conn)
 }
 
-func Redirect(url string, code int) Endpoint {
-	return func(ctx tpot.Context) error {
+func Redirect[C tpot.Context](url string, code int) Endpoint[C] {
+	return func(ctx C) error {
 		ctx.Redirect(url, code)
 		return nil
 	}
 }
 
-func HTTP(handler http.Handler) Endpoint {
-	return func(ctx tpot.Context) error {
+func HTTP[C tpot.Context](handler http.Handler) Endpoint[C] {
+	return func(ctx C) error {
 		handler.ServeHTTP(ctx.Writer(), ctx.Request())
 		return nil
 	}
