@@ -3,7 +3,6 @@ package tpot
 import (
 	"context"
 	"net/http"
-	"net/url"
 )
 
 type ContextBuilder[C Context] func(http.ResponseWriter, *http.Request) C
@@ -32,28 +31,6 @@ type Context interface {
 	Writer() http.ResponseWriter
 	Request() *http.Request
 
-	RealIP() (string, bool)
-
-	URL() *url.URL
-	PathValue(key string) string
-
-	SetHeader(key, value string)
-	GetHeader(key string) string
-
-	Cookie(key string) (*http.Cookie, error)
-	SetCookie(cookie *http.Cookie)
-
-	Query() (url.Values, error)
-	QueryValue(key string) string
-
-	Form() (url.Values, error)
-	FormValue(key string) (string, error)
-
 	Err(err error)
-	Error(format string, args ...any)
-
-	String(format string, args ...any)
-
-	SetStatus(code int)
 	Redirect(path string, code int)
 }
