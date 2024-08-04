@@ -41,107 +41,113 @@ type WebSocket[C tpot.Context] func(C) (*websocket.Upgrader, func(conn *websocke
 
 func (page Page[C]) Handler(ctx tpot.ContextBuilder[C]) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		page.Serve(ctx(w, r))
+		if err := page.Serve(ctx(w, r)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 }
 
-func (page Page[C]) Serve(ctx C) {
+func (page Page[C]) Serve(ctx C) error {
 	layout, body, err := page(ctx)
 	if err != nil {
-		ctx.Err(errors.Wrap(err, "page handler returned an error"))
-		return
+		return errors.Wrap(err, "page handler returned an error")
 	}
 	if layout == nil && body == nil {
-		return
+		return nil
 	} else if layout == nil {
-		err = body.Render(ctx.Ctx(), ctx.Writer())
+		err = body.Render(ctx.Context(), ctx.Writer())
 		if err != nil {
-			ctx.Err(errors.Wrap(err, "failed to render body component"))
-			return
+			return errors.Wrap(err, "failed to render body component")
 		}
-		return
+		return nil
 	}
 
 	withLayout, err := layout(ctx, body)
 	if err != nil {
-		ctx.Err(errors.Wrap(err, "layout handler returned an error"))
-		return
+		return errors.Wrap(err, "layout handler returned an error")
 	}
 	if withLayout == nil {
-		return
+		return nil
 	}
 
-	err = withLayout.Render(ctx.Ctx(), ctx.Writer())
+	err = withLayout.Render(ctx.Context(), ctx.Writer())
 	if err != nil {
-		ctx.Err(errors.Wrap(err, "failed to render layout component"))
-		return
+		return errors.Wrap(err, "failed to render layout component")
 	}
+
+	return nil
 }
 
 func (partial Partial[C]) Handler(ctx tpot.ContextBuilder[C]) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		partial.Serve(ctx(w, r))
+		if err := partial.Serve(ctx(w, r)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 }
 
-func (partial Partial[C]) Serve(ctx C) {
+func (partial Partial[C]) Serve(ctx C) error {
 	content, err := partial(ctx)
 	if err != nil {
-		ctx.Err(errors.Wrap(err, "partial handler returned an error"))
-		return
+		return errors.Wrap(err, "partial handler returned an error")
 	}
 	if content == nil {
-		return
+		return nil
 	}
 
-	err = content.Render(ctx.Ctx(), ctx.Writer())
+	err = content.Render(ctx.Context(), ctx.Writer())
 	if err != nil {
-		ctx.Err(errors.Wrap(err, "failed to render body component"))
-		return
+		return errors.Wrap(err, "failed to render body component")
 	}
+
+	return nil
 }
 
 func (endpoint Endpoint[C]) Handler(ctx tpot.ContextBuilder[C]) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		endpoint.Serve(ctx(w, r))
+		if err := endpoint.Serve(ctx(w, r)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 }
 
-func (endpoint Endpoint[C]) Serve(ctx C) {
+func (endpoint Endpoint[C]) Serve(ctx C) error {
 	err := endpoint(ctx)
 	if err != nil {
-		ctx.Err(errors.Wrap(err, "endpoint handler returned an error"))
-		return
+		return errors.Wrap(err, "endpoint handler returned an error")
 	}
+
+	return nil
 }
 
 func (ws WebSocket[C]) Handler(ctx tpot.ContextBuilder[C]) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ws.Serve(ctx(w, r))
+		if err := ws.Serve(ctx(w, r)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 }
 
-func (ws WebSocket[C]) Serve(ctx C) {
+func (ws WebSocket[C]) Serve(ctx C) error {
 	u, handler, err := ws(ctx)
 	if err != nil {
-		ctx.Err(errors.Wrap(err, "websocket handler returned an error"))
-		return
+		return errors.Wrap(err, "websocket handler returned an error")
 	}
 	if u == nil || handler == nil {
-		return
+		return nil
 	}
 
 	conn, err := u.Upgrade(ctx.Writer(), ctx.Request(), nil)
 	if err != nil {
-		ctx.Err(errors.Wrap(err, "failed to upgrade a websocket"))
-		return
+		return errors.Wrap(err, "failed to upgrade a websocket")
 	}
-	handler(conn)
+
+	return handler(conn)
 }
 
 func Redirect[C tpot.Context](url string, code int) Endpoint[C] {
 	return func(ctx C) error {
-		ctx.Redirect(url, code)
+		http.Redirect(ctx.Writer(), ctx.Request(), url, code)
 		return nil
 	}
 }
