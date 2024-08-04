@@ -10,12 +10,12 @@ type ContextBuilder[C Context] func(http.ResponseWriter, *http.Request) C
 
 type Servable[C Context] interface {
 	Handler(ContextBuilder[C]) http.Handler
-	Serve(Context)
+	Serve(C)
 }
 
-type Middleware func(ctx Context, next func(Context)) func(Context)
+type Middleware[C Context] func(ctx C, next func(C)) func(C)
 
-func ChainHandler[C Context](ctxBuilder ContextBuilder[C], s Servable[C], middleware ...Middleware) http.Handler {
+func ChainHandler[C Context](ctxBuilder ContextBuilder[C], s Servable[C], middleware ...Middleware[C]) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := ctxBuilder(w, r)
 		chain := s.Serve
